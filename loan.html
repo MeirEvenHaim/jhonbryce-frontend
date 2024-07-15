@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="icon" type="image/jpg" href="glasses-1052010_640 (1).jpg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Book</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="display.html">Display Books</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <h1>Loan a Book</h1>
+        <form id="loanForm">
+            <label for="book_id">Book:</label>
+            <select id="book_id" name="book_id" required>
+                <!-- Book options will be populated by JavaScript -->
+            </select>
+            <label for="user_id">User:</label>
+            <select id="user_id" name="user_id" required>
+                <!-- User options will be populated by JavaScript -->
+            </select>
+            <label for="return_date">Return Date:</label>
+            <input type="date" id="return_date" name="return_date" required>
+            <button type="submit">Loan Book</button>
+        </form>
+        <h2>Loaned Books</h2>
+        <div class="row" id="loanCards">
+            <!-- Loan cards will be populated by JavaScript -->
+        </div>
+    </main>
+    <footer>
+        <p>Contact us at: library@example.com</p>
+    </footer>
+    <script>
+        const SERVER = "http://127.0.0.1:5000";
+
+        document.addEventListener("DOMContentLoaded", function () {
+            loadBooksAndUsers();
+            loadLoans();
+        });
+
+        async function loadBooksAndUsers() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    alert('You must be logged in to loan books!');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const booksResponse = await axios.get(`${SERVER}/books`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                console.log('Books:', booksResponse.data);
+                populateSelectOptions('book_id', booksResponse.data, 'book_name', 'id');
+
+                const usersResponse = await axios.get(`${SERVER}/register`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                console.log('Users:', usersResponse.data);
+                populateSelectOptions('user_id', usersResponse.data, 'username', 'id');
+            } catch (error) {
+                console.error('Failed to fetch data:', error);
+                alert('Failed to fetch data. Please try again later.');
+            }
+        }
+
+        function populateSelectOptions(selectId, data, textProp, valueProp) {
+            const selectElement = document.getElementById(selectId);
+            selectElement.innerHTML = '';
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item[valueProp];
+                option.textContent = `${item[textProp]} (ID: ${item[valueProp]})`;
+                selectElement.appendChild(option);
+            });
+        }
+
+        document.getElementById('loanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const book_id = document.getElementById('book_id').value;
+            const user_id = document.getElementById('user_id').value;
+            const return_date = document.getElementById('return_date').value;
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    alert('You must be logged in to loan books!');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                await axios.post(`${SERVER}/loans`, {
+                    book_id,
+                    client_id: user_id,
+                    return_date
+                }, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                alert('Book loaned successfully!');
+                loadLoans();
+            } catch (error) {
+                console.error('Loan failed:', error);
+                alert('Loan failed. Please try again.');
+            }
+        });
+
+        async function loadLoans() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    alert('You must be logged in to view loans!');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const loansResponse = await axios.get(`${SERVER}/loans`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const loans = loansResponse.data;
+                console.log('Loans:', loans);
+                displayLoans(loans);
+            } catch (error) {
+                console.error('Failed to fetch loans:', error);
+                alert('Failed to fetch loans. Please try again later.');
+            }
+        }
+
+        function displayLoans(loans) {
+            const loanCards = document.getElementById('loanCards');
+            loanCards.innerHTML = ''; // Clear previous content
+
+            loans.forEach(loan => {
+                const card = document.createElement('div');
+                card.className = 'col-md-4 mb-4';
+                card.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Loan ID: ${loan.id}</h5>
+                            <p class="card-text">Book: ${loan.book_name}</p>
+                            <p class="card-text">Client: ${loan.client_name} (${loan.client_address})</p>
+                            <p class="card-text">Admin: ${loan.admin_name} (${loan.admin_address})</p>
+                            <p class="card-text">Loan Date: ${loan.loan_date}</p>
+                            <p class="card-text">Return Date: ${loan.return_date}</p>
+                            <button class="btn btn-primary mr-2" onclick="editLoan(${loan.id})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteLoan(${loan.id})">Delete</button>
+                        </div>
+                    </div>
+                `;
+                loanCards.appendChild(card);
+            });
+        }
+
+        async function editLoan(loanId) {
+            const newReturnDate = prompt('Enter new return date (YYYY-MM-DD):');
+            if (newReturnDate) {
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.put(`${SERVER}/loans/${loanId}`, {
+                        return_date: newReturnDate
+                    }, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    alert('Loan updated successfully!');
+                    loadLoans();
+                } catch (error) {
+                    console.error('Failed to update loan:', error);
+                    alert('Failed to update loan. Please try again.');
+                }
+            }
+        }
+
+        async function deleteLoan(loanId) {
+            if (confirm('Are you sure you want to delete this loan?')) {
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.delete(`${SERVER}/loans/${loanId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    alert('Loan deleted successfully!');
+                    loadLoans();
+                } catch (error) {
+                    console.error('Failed to delete loan:', error);
+                    alert('Failed to delete loan. Please try again.');
+                }
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+
+</html>
